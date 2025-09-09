@@ -1,7 +1,7 @@
 // src/utils/chains.ts
-import type { Chain } from "viem";
+import type { Network } from "ethers";
 
-export function getChainLabel(chainId: number | null, chain?: Chain): string {
+export function getChainLabel(chainId: number | null, chain?: Network): string {
   switch (chainId) {
     case 1:
       return "Ethereum";
