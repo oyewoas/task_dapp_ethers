@@ -2,13 +2,15 @@
 import { useEffect } from "react";
 import { ethers } from "ethers";
 import { useAppState } from "../store/context";
+import { getProvider } from "../utils/provider";
 
 export function useTaskEvents() {
   const { state, dispatch, abi } = useAppState();
-  const { provider, contractAddress } = state;
+  const { contractAddress } = state;
 
   useEffect(() => {
-    if (!provider || !contractAddress) return;
+    if (!contractAddress) return;
+    const provider = getProvider();
 
     const contract = new ethers.Contract(contractAddress, abi, provider);
 
@@ -40,5 +42,5 @@ export function useTaskEvents() {
     return () => {
       contract.removeAllListeners();
     };
-  }, [provider, contractAddress, abi, dispatch]);
+  }, [contractAddress, abi, dispatch]);
 }

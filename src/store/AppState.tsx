@@ -1,5 +1,5 @@
 // src/state/AppStateProvider.tsx
-import { useCallback, useEffect, useReducer, useMemo } from "react";
+import { useEffect, useReducer } from "react";
 import { ethers } from "ethers";
 import abi from "../utils/abi.json";
 import { Ctx } from "./context";
@@ -17,7 +17,6 @@ export type LogEntry = { text: string; hash?: string };
 export type NoticeEntry = { text: string };
 
 export type AppState = {
-  provider: ethers.BrowserProvider | ethers.JsonRpcProvider | null;
   signer: ethers.Signer | null;
   account: string | null;
   contractAddress: string;
@@ -33,7 +32,6 @@ export type AppState = {
 export type AppAction =
   | {
       type: "SET_CLIENTS";
-      provider: ethers.BrowserProvider |  ethers.JsonRpcProvider | null;
       signer: ethers.Signer | null;
       chainId: number | null;
       account: string | null;
@@ -49,7 +47,6 @@ export type AppAction =
   | { type: "ERROR"; error: string };
 
 const initial: AppState = {
-  provider: null,
   signer: null,
   account: null,
   chainId: null,
@@ -67,7 +64,6 @@ function reducer(state: AppState, a: AppAction): AppState {
     case "SET_CLIENTS":
       return {
         ...state,
-        provider: a.provider,
         signer: a.signer,
         chainId: a.chainId,
         account: a.account,
@@ -103,42 +99,6 @@ function reducer(state: AppState, a: AppAction): AppState {
 
 export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initial);
-  const iface = useMemo(() => new ethers.Interface(abi), []);
-
-  const EventSwitch = useCallback(
-    (eventName: string, args?: Record<string, unknown>) => {
-      switch (eventName) {
-        case "TaskCreated": {
-          dispatch({
-            type: "LOG",
-            text: `Event TaskCreated: ${(args?.description as string) || "Event TaskCreated"}`,
-            hash: args?.hash as string,
-          });
-          break;
-        }
-        case "TaskUpdated": {
-          const id = args?.id as bigint;
-          const desc = args?.description as string;
-          dispatch({
-            type: "LOG",
-            text: `Event TaskUpdated: #${id}${desc ? ` -> ${desc}` : ""}`,
-            hash: args?.hash as string,
-          });
-          break;
-        }
-        case "TaskCompleted": {
-          const id = args?.id as bigint;
-          dispatch({
-            type: "LOG",
-            text: `Event TaskCompleted: #${id}`,
-            hash: args?.hash as string,
-          });
-          break;
-        }
-      }
-    },
-    [dispatch]
-  );
 
   useEffect(() => {
     if (!state.contractAddress) return;
@@ -148,51 +108,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
     async function init() {
       try {
-        const eth = window.ethereum;
-        if (!eth) return;
+
 
         const provider = getProvider();
         const signer = await provider.getSigner();
         const addr = await signer.getAddress();
         const { chainId } = await provider.getNetwork();
-
-        // fetch historical logs
-        try {
-          const logs = await provider.getLogs({
-            address: state.contractAddress,
-            fromBlock: 0n,
-            toBlock: "latest",
-          });
-          for (const log of logs) {
-            try {
-              const parsed = iface.parseLog({
-                topics: log.topics,
-                data: log.data,
-              });
-              if (parsed) {
-                const { id, description } = parsed.args as { id?: bigint; description?: string };
-
-                EventSwitch(parsed.name, {
-                  id,
-                  description,
-                  hash: log.transactionHash,
-                });
-              }
-            } catch (err) {
-              console.warn("Failed to parse log:", log, err);
-            }
-          }
-        } catch (err) {
-          console.warn("Failed to fetch logs:", err);
-        }
-
         dispatch({
           type: "SET_CLIENTS",
-          provider,
           signer,
           chainId: Number(chainId),
           account: addr ?? null,
         });
+        // fetch historical logs
+       
+
+      
 
         // attach listeners
         accountsHandler = (accounts: string[]) => {
@@ -209,8 +140,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           });
         };
 
-        eth.on?.("accountsChanged", accountsHandler);
-        eth.on?.("chainChanged", chainHandler);
+        window.ethereum.on?.("accountsChanged", accountsHandler);
+        window.ethereum.on?.("chainChanged", chainHandler);
       } catch (e) {
         dispatch({
           type: "ERROR",
@@ -227,7 +158,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       if (chainHandler)
         window.ethereum?.removeListener?.("chainChanged", chainHandler);
     };
-  }, [EventSwitch, state.contractAddress, iface]);
+  }, [state.contractAddress]);
 
   return (
     <Ctx.Provider value={{ state, dispatch, abi }}>

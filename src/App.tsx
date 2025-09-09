@@ -1,6 +1,5 @@
 // src/App.tsx
 import { useEffect, useState } from "react";
-import { ethers } from "ethers";
 import { WalletBar } from "./components/WalletBar";
 import { TaskForm } from "./components/TaskForm";
 import { TaskList } from "./components/TaskList";
@@ -13,6 +12,7 @@ import { useTaskEvents } from "./hooks/useTaskEvents";
 import type { Task } from "./types";
 import { useTaskRead } from "./hooks/useTaskRead";
 import { useTaskWrite } from "./hooks/useTaskWrite";
+import { getProvider } from "./utils/provider";
 
 function App() {
   const { state, dispatch } = useAppState();
@@ -21,12 +21,10 @@ function App() {
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [editingTaskId, setEditingTaskId] = useState<bigint | null>(null);
   const [editingTaskDesc, setEditingTaskDesc] = useState("");
-
-  const canRead = Boolean(contractAddress && signer?.provider);
+  const canRead = Boolean(contractAddress);
   const canWrite = Boolean(contractAddress && signer && account);
-
   // Hooks
-  const { loadTasks } = useTaskRead();
+  const { loadTasks, loadLogs } = useTaskRead();
   useTaskEvents();
   const { createTask, updateTask, completeTask } = useTaskWrite();
 
@@ -36,7 +34,7 @@ function App() {
     if (!eth) return;
 
     try {
-      const provider = new ethers.BrowserProvider(eth);
+      const provider = getProvider();
       const signer = await provider.getSigner();
       const network = await provider.getNetwork();
       const addr = await signer.getAddress();
@@ -44,7 +42,6 @@ function App() {
       dispatch({
         type: "SET_CLIENTS",
         signer,
-        provider,
         chainId: Number(network.chainId),
         account: addr,
       });
@@ -68,7 +65,6 @@ function App() {
       dispatch({
         type: "SET_CLIENTS",
         signer: null,
-        provider: null,
         chainId: null,
         account: null,
       });
@@ -83,6 +79,7 @@ function App() {
     await createTask(newTaskDesc, () => {
       setNewTaskDesc("");
       loadTasks();
+      loadLogs();
     });
   }
 
@@ -93,6 +90,7 @@ function App() {
       setEditingTaskId(null);
       setEditingTaskDesc("");
       loadTasks();
+      loadLogs()
     });
   }
 
@@ -100,6 +98,7 @@ function App() {
     if (!canWrite || !signer || !contractAddress) return;
     await completeTask(id, () => {
       loadTasks();
+      loadLogs()
     });
   }
 
@@ -107,10 +106,11 @@ function App() {
   useEffect(() => {
     if (canRead) {
       loadTasks();
+      loadLogs()
     } else {
       dispatch({ type: "SET_TASKS", tasks: [] });
     }
-  }, [canRead, loadTasks, dispatch]);
+  }, [canRead, loadTasks, loadLogs, dispatch]);
 
   const chainLabel = getChainLabel(chainId);
   const explorerBase = getExplorerBase(chainId);

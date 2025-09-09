@@ -1,7 +1,7 @@
 // src/components/WalletBar.tsx
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import { useAppState } from "../store/context";
+import { getProvider } from "../utils/provider";
 
 export function WalletBar({
   account,
@@ -15,14 +15,13 @@ export function WalletBar({
   onDisconnect: () => void;
 }) {
   const [balance, setBalance] = useState<string>("");
-  const { state } = useAppState();
-  const { provider } = state;
 
   useEffect(() => {
     let active = true;
-    async function load() {
+    async function load() { 
       try {
-        if (account && provider) {
+        if (account) {
+          const provider = getProvider();
           const bal = await provider.getBalance(account);
           if (!active) return;
           setBalance(`${ethers.formatEther(bal)} ETH`);
@@ -37,7 +36,7 @@ export function WalletBar({
     return () => {
       active = false;
     };
-  }, [account, provider]);
+  }, [account]);
 
   return (
     <div className="w-full max-w-xl mx-auto mb-6 p-6 bg-gradient-to-br from-indigo-50 to-white rounded-2xl shadow-lg flex flex-col gap-4">
